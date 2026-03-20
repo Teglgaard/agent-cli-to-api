@@ -336,6 +336,16 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return float(str(raw).strip())
+    except ValueError:
+        return default
+
+
 def _env_str(name: str, default: str) -> str:
     raw = os.environ.get(name)
     if raw is None:
@@ -475,6 +485,12 @@ class Settings:
     cursor_agent_extra_args: list[str] = field(
         default_factory=lambda: shlex.split(os.environ.get("CURSOR_AGENT_EXTRA_ARGS", "") or "")
     )
+    # Cursor stream-json may emit a second full assistant body that is ~the same plan again.
+    # When True, suppress streaming near-duplicates and use suffix/prefix overlap continuation.
+    cursor_stream_dedupe: bool = _env_bool("CODEX_CURSOR_STREAM_DEDUPE", True)
+    cursor_stream_dedupe_ratio: float = _env_float("CODEX_CURSOR_STREAM_DEDUPE_RATIO", 0.88)
+    cursor_stream_dedupe_min_chars: int = _env_int("CODEX_CURSOR_STREAM_DEDUPE_MIN_CHARS", 400)
+    cursor_stream_suffix_overlap_min: int = _env_int("CODEX_CURSOR_STREAM_SUFFIX_OVERLAP_MIN", 48)
 
     claude_bin: str = os.environ.get("CLAUDE_BIN", "claude")
     claude_model: str | None = (_env_str("CLAUDE_MODEL", "").strip() or None)

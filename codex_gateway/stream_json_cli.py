@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import os
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 
 from .openai_compat import normalize_message_content
+
+
+def _max_suffix_prefix_overlap(a: str, b: str) -> int:
+    max_k = min(len(a), len(b))
+    for k in range(max_k, 0, -1):
+        if a.endswith(b[:k]):
+            return k
+    return 0
 
 
 @dataclass(frozen=True)
@@ -35,6 +44,45 @@ class TextAssembler:
             self.text = incoming
             return delta
         # Fallback: treat as delta chunk.
+        self.text += incoming
+        return incoming
+
+    def feed_cursor(
+        self,
+        incoming: str,
+        *,
+        dedupe: bool = True,
+        dedupe_ratio: float = 0.88,
+        dedupe_min_chars: int = 400,
+        suffix_overlap_min: int = 48,
+    ) -> str:
+        incoming = incoming or ""
+        if not incoming:
+            return ""
+        if incoming == self.text:
+            return ""
+        if incoming.startswith(self.text):
+            delta = incoming[len(self.text) :]
+            self.text = incoming
+            return delta
+        if len(incoming) >= suffix_overlap_min and self.text.endswith(incoming):
+            return ""
+        k = _max_suffix_prefix_overlap(self.text, incoming)
+        if k >= suffix_overlap_min:
+            delta = incoming[k:]
+            self.text = self.text + delta
+            return delta
+        if (
+            dedupe
+            and dedupe_ratio > 0
+            and len(incoming) >= dedupe_min_chars
+            and len(self.text) >= dedupe_min_chars
+        ):
+            r = difflib.SequenceMatcher(a=self.text, b=incoming).ratio()
+            if r >= dedupe_ratio:
+                if len(incoming) > len(self.text):
+                    self.text = incoming
+                return ""
         self.text += incoming
         return incoming
 
@@ -153,7 +201,17 @@ def extract_cursor_agent_delta(evt: dict, assembler: TextAssembler) -> str:
     if not isinstance(message, dict):
         return ""
     incoming = extract_text_from_content(message.get("content"))
-    return assembler.feed(incoming)
+    from .config import settings
+
+    if not settings.cursor_stream_dedupe:
+        return assembler.feed(incoming)
+    return assembler.feed_cursor(
+        incoming,
+        dedupe=True,
+        dedupe_ratio=settings.cursor_stream_dedupe_ratio,
+        dedupe_min_chars=settings.cursor_stream_dedupe_min_chars,
+        suffix_overlap_min=settings.cursor_stream_suffix_overlap_min,
+    )
 
 
 def extract_claude_delta(evt: dict, assembler: TextAssembler) -> str:
