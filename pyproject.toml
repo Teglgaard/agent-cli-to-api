@@ -19,6 +19,12 @@ dependencies = [
   "uvicorn[standard]>=0.30.0",
 ]
 
+[project.optional-dependencies]
+bridge = [
+  "httpx>=0.27.0",
+  "litellm[proxy]>=1.55.8",
+]
+
 [project.scripts]
 agent-cli-to-api = "codex_gateway.cli:main"
 

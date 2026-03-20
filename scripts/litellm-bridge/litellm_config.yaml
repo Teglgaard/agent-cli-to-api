@@ -1,0 +1,24 @@
+# LiteLLM: Anthropic /v1/messages (Claude Code) -> agent-cli-to-api (OpenAI-compatible /v1/chat/completions).
+#
+# Use hosted_vllm/ so LiteLLM keeps the Chat Completions code path (openai/ can trigger /v1/responses
+# on some versions, which is brittle for minimal gateways).
+#
+# Environment:
+#   AGENT_CLI_API_BASE   origin only, e.g. http://127.0.0.1:11434  (no /v1 suffix)
+#   AGENT_CLI_API_KEY    Bearer token for the gateway (match CODEX_GATEWAY_TOKEN); use "not-used" if none
+
+litellm_settings:
+  drop_params: True
+
+model_list:
+  - model_name: cursor-composer-2-fast
+    litellm_params:
+      model: hosted_vllm/composer-2-fast
+      api_base: os.environ/AGENT_CLI_API_BASE
+      api_key: os.environ/AGENT_CLI_API_KEY
+
+  - model_name: composer-2-fast
+    litellm_params:
+      model: hosted_vllm/composer-2-fast
+      api_base: os.environ/AGENT_CLI_API_BASE
+      api_key: os.environ/AGENT_CLI_API_KEY
