@@ -1,6 +1,16 @@
-# Source before `claude` when LiteLLM bridge runs on this machine (LiteLLM default :4000).
+#!/bin/sh
+#
+# MUST be SOURCED (loaded into your current shell). Do NOT run with sudo.
+#
+#   source ~/Krown-Development/agent-cli-to-api/scripts/litellm-bridge/env-for-claude.sh
+#
+# Wrong (exports vanish or fail):
+#   ./env-for-claude.sh
+#   bash env-for-claude.sh
+#   sudo .../env-for-claude.sh
+#
 # Easiest: scripts/litellm-bridge/claude-via-bridge.sh (checks health + sources this file).
-# Or: source scripts/litellm-bridge/env-for-claude.sh
+# Source before `claude` when LiteLLM bridge runs on this machine (LiteLLM default :4000).
 #
 # run_bridge.py starts a second agent-cli-to-api on :11435 with NO CODEX_GATEWAY_TOKEN
 # (Composer uses Cursor CLI login). OpenClaw on :11434 with a token is separate.
