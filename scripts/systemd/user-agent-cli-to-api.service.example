@@ -1,0 +1,32 @@
+# User systemd unit: ~/.config/systemd/user/agent-cli-to-api.service
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp scripts/systemd/user-agent-cli-to-api.service.example ~/.config/systemd/user/agent-cli-to-api.service
+#   # Edit paths if your repo is not ~/agent-cli-to-api
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now agent-cli-to-api.service
+#   loginctl enable-linger "$USER"   # if not already (needed for boot without login)
+#
+# Environment matches scripts/start-openclaw-gateway.sh + Mac start-bridge.sh (CODEX_PRESET=multi-composer2).
+
+[Unit]
+Description=agent-cli-to-api (OpenClaw Cursor bridge, composer-2-fast preset)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/agent-cli-to-api
+Environment=HOME=%h
+Environment=CODEX_PRESET=multi-composer2
+Environment=CURSOR_AGENT_BIN=%h/.local/bin/cursor-agent
+Environment=CURSOR_AGENT_WORKSPACE=%h/.cursor-agent-workspace
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-%h/agent-cli-to-api/.env
+ExecStart=%h/agent-cli-to-api/venv/bin/agent-cli-to-api --host 127.0.0.1 --port 11434
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
