@@ -75,14 +75,19 @@ def _install_hint() -> str:
     )
 
 
-def _load_codex_gateway_token_from_dotenv() -> None:
-    """If CODEX_GATEWAY_TOKEN is unset, pick it up from repo .env (same as many gateway installs)."""
-    if os.environ.get("CODEX_GATEWAY_TOKEN", "").strip():
+def _apply_dotenv_bridge_keys_if_unset() -> None:
+    """Fill CODEX_GATEWAY_TOKEN / LITELLM_MASTER_KEY from repo .env when not already in the environment."""
+    keys_needed = [
+        k
+        for k in ("CODEX_GATEWAY_TOKEN", "LITELLM_MASTER_KEY")
+        if not os.environ.get(k, "").strip()
+    ]
+    if not keys_needed:
         return
     path = REPO_ROOT / ".env"
     if not path.is_file():
         return
-    key = "CODEX_GATEWAY_TOKEN"
+    pending = set(keys_needed)
     for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
@@ -90,14 +95,19 @@ def _load_codex_gateway_token_from_dotenv() -> None:
         if line.startswith("export "):
             line = line[len("export ") :].strip()
         k, sep, val = line.partition("=")
-        if not sep or k.strip() != key:
+        if not sep:
+            continue
+        name = k.strip()
+        if name not in pending:
             continue
         val = val.strip()
         if val and val[0] in {"'", '"'} and val[-1] == val[0]:
             val = val[1:-1]
         if val:
-            os.environ[key] = val
-        break
+            os.environ[name] = val
+            pending.discard(name)
+            if not pending:
+                break
 
 
 def _gateway_child_env(*, strip_codex_bearer: bool) -> dict[str, str]:
@@ -108,12 +118,17 @@ def _gateway_child_env(*, strip_codex_bearer: bool) -> dict[str, str]:
     return out
 
 
-def _wait_http(url: str, timeout_s: float = 60.0, interval_s: float = 0.3) -> None:
+def _wait_http(
+    url: str,
+    timeout_s: float = 60.0,
+    interval_s: float = 0.3,
+    headers: dict[str, str] | None = None,
+) -> None:
     deadline = time.monotonic() + timeout_s
     last_err = None
     while time.monotonic() < deadline:
         try:
-            r = httpx.get(url, timeout=2.0)
+            r = httpx.get(url, timeout=2.0, headers=headers)
             if r.status_code < 500:
                 return
         except Exception as e:
@@ -123,6 +138,7 @@ def _wait_http(url: str, timeout_s: float = 60.0, interval_s: float = 0.3) -> No
 
 
 def main() -> int:
+    _apply_dotenv_bridge_keys_if_unset()
     parser = argparse.ArgumentParser(description="Start agent-cli-to-api + LiteLLM bridge")
     parser.add_argument("--gateway-host", default="127.0.0.1")
     parser.add_argument(
@@ -132,6 +148,12 @@ def main() -> int:
         help="Bridge child defaults to 11435; with --skip-gateway defaults to 11434 (your existing gateway).",
     )
     parser.add_argument("--litellm-port", type=int, default=4000)
+    parser.add_argument(
+        "--litellm-host",
+        default=os.environ.get("LITELLM_BIND_HOST", "127.0.0.1"),
+        help="Address LiteLLM listens on (127.0.0.1 default; use 0.0.0.0 for LAN). "
+        "Override via LITELLM_BIND_HOST.",
+    )
     parser.add_argument(
         "--gateway-cmd",
         default="auto",
@@ -158,8 +180,6 @@ def main() -> int:
 
     if args.gateway_port is None:
         args.gateway_port = 11434 if args.skip_gateway else 11435
-
-    _load_codex_gateway_token_from_dotenv()
 
     gateway_bin = None if args.skip_gateway else _find_gateway_executable()
     litellm_bin = _find_litellm_executable()
@@ -250,15 +270,23 @@ def main() -> int:
         "--config",
         str(args.litellm_config),
         "--host",
-        "127.0.0.1",
+        args.litellm_host,
         "--port",
         str(args.litellm_port),
     ]
 
     print("[bridge] starting LiteLLM:", " ".join(litellm_argv), flush=True)
     ll_proc = subprocess.Popen(litellm_argv, cwd=str(REPO_ROOT))
+    ll_health_headers: dict[str, str] | None = None
+    mk_wait = (args.master_key or "").strip()
+    if mk_wait:
+        ll_health_headers = {"Authorization": f"Bearer {mk_wait}"}
     try:
-        _wait_http(f"http://127.0.0.1:{args.litellm_port}/health/liveliness", timeout_s=90.0)
+        _wait_http(
+            f"http://127.0.0.1:{args.litellm_port}/health/liveliness",
+            timeout_s=90.0,
+            headers=ll_health_headers,
+        )
     except Exception:
         ll_proc.terminate()
         if gw_proc:
@@ -270,7 +298,7 @@ def main() -> int:
         "\n--- Claude Code (example env) ---\n"
         f"export ANTHROPIC_BASE_URL=http://127.0.0.1:{args.litellm_port}\n"
         + (
-            f'export ANTHROPIC_AUTH_TOKEN="{args.master_key}"\n'
+            "export ANTHROPIC_AUTH_TOKEN=\"$LITELLM_MASTER_KEY\"  # same secret as LITELLM_MASTER_KEY / .env\n"
             if args.master_key
             else "# No LITELLM_MASTER_KEY — omit bearer if proxy is open\n"
         )

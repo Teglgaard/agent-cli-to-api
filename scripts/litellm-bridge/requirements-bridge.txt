@@ -1,4 +1,4 @@
 # Optional: LiteLLM proxy for Claude Code (Anthropic API) -> agent-cli-to-api (OpenAI API).
 # `proxy` extra pulls in backoff, etc. required by litellm proxy server.
-litellm[proxy]>=1.55.8
+litellm[proxy]>=1.55.8,<1.83
 httpx>=0.27.0

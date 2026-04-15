@@ -1,0 +1,35 @@
+# User systemd: ~/.config/systemd/user/litellm-bridge.service
+# LiteLLM listens on 0.0.0.0:4000 (reverse-proxy / LAN). Requires agent-cli-to-api on 127.0.0.1:11434.
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp scripts/systemd/user-litellm-bridge.service.example ~/.config/systemd/user/litellm-bridge.service
+#   # Edit WorkingDirectory / paths if repo is not ~/agent-cli-to-api
+#   # Put LITELLM_MASTER_KEY in ~/agent-cli-to-api/.env (chmod 600)
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now agent-cli-to-api.service
+#   systemctl --user enable --now litellm-bridge.service
+#   loginctl enable-linger "$USER"   # optional: start at boot without login
+#
+# Pin litellm[proxy]<1.83 in pyproject (1.83.0 can spin CPU before bind on some hosts).
+
+[Unit]
+Description=LiteLLM bridge (Anthropic -> agent-cli-to-api), port 4000
+After=network-online.target agent-cli-to-api.service
+Wants=network-online.target
+Requires=agent-cli-to-api.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/agent-cli-to-api
+Environment=HOME=%h
+Environment=CODEX_PRESET=multi-composer2
+Environment=PATH=%h/.local/bin:%h/agent-cli-to-api/venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-%h/agent-cli-to-api/.env
+ExecStart=%h/agent-cli-to-api/venv/bin/python %h/agent-cli-to-api/scripts/litellm-bridge/run_bridge.py --skip-gateway --gateway-host 127.0.0.1 --gateway-port 11434 --litellm-host 0.0.0.0 --litellm-port 4000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

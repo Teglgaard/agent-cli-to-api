@@ -10,6 +10,10 @@
 litellm_settings:
   drop_params: True
 
+# Avoid startup hang / high CPU on some proxy versions (see LiteLLM issue #10114).
+general_settings:
+  background_health_checks: false
+
 model_list:
   - model_name: cursor-composer-2-fast
     litellm_params:
@@ -18,6 +22,14 @@ model_list:
       api_key: os.environ/AGENT_CLI_API_KEY
 
   - model_name: composer-2-fast
+    litellm_params:
+      model: hosted_vllm/composer-2-fast
+      api_base: os.environ/AGENT_CLI_API_BASE
+      api_key: os.environ/AGENT_CLI_API_KEY
+
+  # Claudish (and some clients) may still send Anthropic model ids on the wire even when roles map to
+  # ll@cursor-composer-2-fast. Alias common ids to the same gateway so LiteLLM does not 400.
+  - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: hosted_vllm/composer-2-fast
       api_base: os.environ/AGENT_CLI_API_BASE
