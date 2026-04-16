@@ -1,6 +1,8 @@
 """
-LiteLLM proxy: when the request includes image/vision content, rewrite the model to the
-gateway deployment that uses Cursor `auto` instead of Composer 2 Fast.
+LiteLLM proxy: when the *latest user message* includes new image/vision content, rewrite
+the model to the gateway deployment that uses Cursor `auto` instead of Composer 2 Fast.
+Older turns in `messages` may still contain images; we only inspect the last user message
+so text-only follow-ups keep using Composer 2 Fast.
 
 `run_bridge.py` adds this directory to PYTHONPATH for the litellm child; we also insert
 it here so imports work if LiteLLM loads the hook another way.
@@ -24,7 +26,7 @@ if str(_bridge_dir) not in sys.path:
 
 from litellm.integrations.custom_logger import CustomLogger
 
-from vision_input_detect import messages_indicate_image_input
+from vision_input_detect import last_user_message_has_image
 
 _DEFAULT_SOURCES = frozenset(
     {
@@ -69,7 +71,7 @@ class VisionRouteHook(CustomLogger):
         if model not in _source_models():
             return data
         messages = data.get("messages")
-        if not messages_indicate_image_input(messages):
+        if not last_user_message_has_image(messages):
             return data
         data = dict(data)
         data["model"] = _target_model()

@@ -10,7 +10,10 @@ import pytest
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "scripts" / "litellm-bridge"))
 
-from vision_input_detect import messages_indicate_image_input  # noqa: E402
+from vision_input_detect import (  # noqa: E402
+    last_user_message_has_image,
+    messages_indicate_image_input,
+)
 
 
 def test_text_only_messages_false() -> None:
@@ -60,6 +63,50 @@ def test_nested_content_true() -> None:
             {
                 "role": "user",
                 "content": [{"type": "message", "content": [{"type": "image_url", "image_url": {"url": "x"}}]}],
+            }
+        ]
+    )
+
+
+def test_last_user_text_only_after_prior_image_false() -> None:
+    """Follow-up text must not see images in older turns (LiteLLM hook routing)."""
+    assert not last_user_message_has_image(
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "here is a pic"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,OLD"}},
+                ],
+            },
+            {"role": "assistant", "content": "I see a button."},
+            {"role": "user", "content": "What should I tap next?"},
+        ]
+    )
+
+
+def test_last_user_still_has_image_true() -> None:
+    assert last_user_message_has_image(
+        [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "and this"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,NEW"}},
+                ],
+            },
+        ]
+    )
+
+
+def test_last_user_message_only_single_turn() -> None:
+    assert last_user_message_has_image(
+        [
+            {
+                "role": "user",
+                "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,X"}}],
             }
         ]
     )
