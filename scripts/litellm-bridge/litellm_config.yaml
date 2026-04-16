@@ -9,6 +9,8 @@
 
 litellm_settings:
   drop_params: True
+  # Composer 2 Fast for text; requests with image blocks → cursor:auto (see vision_route_hook.py).
+  callbacks: vision_route_hook.vision_route_hook_instance
 
 # Avoid startup hang / high CPU on some proxy versions (see LiteLLM issue #10114).
 general_settings:
@@ -32,5 +34,12 @@ model_list:
   - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: hosted_vllm/composer-2-fast
+      api_base: os.environ/AGENT_CLI_API_BASE
+      api_key: os.environ/AGENT_CLI_API_KEY
+
+  # Selected by vision_route_hook when messages include images (Cursor agent --model auto).
+  - model_name: cursor-vision-auto
+    litellm_params:
+      model: hosted_vllm/cursor:auto
       api_base: os.environ/AGENT_CLI_API_BASE
       api_key: os.environ/AGENT_CLI_API_KEY

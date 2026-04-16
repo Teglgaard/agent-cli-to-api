@@ -16,6 +16,7 @@ build/
 
 # Local config / secrets
 .env
+.claude/settings.json
 
 # Gateway-local Codex home (avoid committing auth/config)
 .codex-gateway-home/

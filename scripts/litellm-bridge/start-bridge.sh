@@ -11,6 +11,11 @@
 # If Composer runs longer than OpenClaw's embedded timeout (often ~120s), raise timeoutSeconds in
 # ~/.openclaw-dench/openclaw.json so the primary can finish before failover.
 #
+# Vision routing: litellm_config.yaml registers vision_route_hook (Composer 2 Fast for text,
+# cursor:auto when messages include images). PYTHONPATH must include this directory so LiteLLM
+# can import the hook — run_bridge.py sets that for the litellm child; we also export it here
+# so the same behavior holds if you run tools from this shell or adjust run_bridge.
+#
 # Usage:
 #   ./scripts/litellm-bridge/start-bridge.sh
 #   ./scripts/litellm-bridge/start-bridge.sh --litellm-port 4001
@@ -33,6 +38,9 @@ fi
 
 unset AGENT_CLI_API_BASE
 export CODEX_PRESET="${CODEX_PRESET:-multi-composer2}"
+
+# LiteLLM callbacks: import vision_route_hook from this folder (see litellm_config.yaml).
+export PYTHONPATH="${SCRIPT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"
 
 # Match scripts/start-openclaw-gateway.sh + Linux user systemd so cursor-agent and workspace match
 # the Dench box (avoids flaky Composer path and unnecessary OpenClaw failover).

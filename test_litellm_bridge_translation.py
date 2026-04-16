@@ -24,7 +24,8 @@ from pathlib import Path
 import httpx
 
 REPO_ROOT = Path(__file__).resolve().parent
-BRIDGE_CONFIG = REPO_ROOT / "scripts" / "litellm-bridge" / "litellm_config.yaml"
+BRIDGE_DIR = REPO_ROOT / "scripts" / "litellm-bridge"
+BRIDGE_CONFIG = BRIDGE_DIR / "litellm_config.yaml"
 
 
 def _pick_port() -> int:
@@ -121,6 +122,10 @@ def main() -> int:
     cfg_dst = Path(tempfile.mkdtemp()) / "litellm_bridge_test.yaml"
     cfg_dst.write_text(BRIDGE_CONFIG.read_text(encoding="utf-8"), encoding="utf-8")
 
+    ll_env = dict(os.environ)
+    _prev = (ll_env.get("PYTHONPATH") or "").strip()
+    ll_env["PYTHONPATH"] = str(BRIDGE_DIR) + (os.pathsep + _prev if _prev else "")
+
     proc = subprocess.Popen(
         [
             litellm_bin,
@@ -132,6 +137,7 @@ def main() -> int:
             str(ll_port),
         ],
         cwd=str(REPO_ROOT),
+        env=ll_env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

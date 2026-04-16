@@ -118,6 +118,15 @@ def _gateway_child_env(*, strip_codex_bearer: bool) -> dict[str, str]:
     return out
 
 
+def _litellm_child_env() -> dict[str, str]:
+    """Ensure LiteLLM can import scripts/litellm-bridge/vision_route_hook.py from config callbacks."""
+    out = dict(os.environ)
+    bridge = str(BRIDGE_DIR)
+    prev = (out.get("PYTHONPATH") or "").strip()
+    out["PYTHONPATH"] = bridge + (os.pathsep + prev if prev else "")
+    return out
+
+
 def _wait_http(
     url: str,
     timeout_s: float = 60.0,
@@ -276,7 +285,7 @@ def main() -> int:
     ]
 
     print("[bridge] starting LiteLLM:", " ".join(litellm_argv), flush=True)
-    ll_proc = subprocess.Popen(litellm_argv, cwd=str(REPO_ROOT))
+    ll_proc = subprocess.Popen(litellm_argv, cwd=str(REPO_ROOT), env=_litellm_child_env())
     ll_health_headers: dict[str, str] | None = None
     mk_wait = (args.master_key or "").strip()
     if mk_wait:
