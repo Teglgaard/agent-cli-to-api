@@ -22,5 +22,5 @@ build/
 .codex-gateway-home/
 .codex_home*/
 
-# Working-copy-only dirs from external tools (never part of this package’s releases)
+# Local agent-orchestration state if you run those tools from this clone (not shipped)
 .omx/

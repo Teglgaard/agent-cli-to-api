@@ -92,7 +92,7 @@ TOKEN=devtoken BASE_URL=http://127.0.0.1:8000/v1 ./scripts/smoke.sh
 
 ### Codex CLI + LiteLLM (local bridge)
 
-The [OpenAI Codex CLI](https://github.com/openai/codex) can talk to this gateway **through LiteLLM** (recommended entry point: `scripts/litellm-bridge/codex-local.sh`, which can start the bridge for you). Full steps, env vars, and health checks: `scripts/litellm-bridge/README.md`.
+The [OpenAI Codex CLI](https://github.com/openai/codex) talks to this gateway **through LiteLLM** on `:4000`. Start the bridge in **one** terminal, then run Codex in **another** (`scripts/litellm-bridge/codex-via-bridge.sh` or `source .../env-for-codex.sh`). Full steps, env vars, and health checks: `scripts/litellm-bridge/README.md`.
 
 ## API
 
