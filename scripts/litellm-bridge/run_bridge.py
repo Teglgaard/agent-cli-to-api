@@ -314,7 +314,16 @@ def main() -> int:
         + "export ANTHROPIC_API_KEY=\"\"\n"
         + "export ANTHROPIC_CUSTOM_MODEL_OPTION=cursor-composer-2-fast\n"
         + 'export ANTHROPIC_CUSTOM_MODEL_OPTION_NAME="Composer 2 Fast (local gateway)"\n'
-        + "claude\n",
+        + "claude\n"
+        + "\n--- OpenAI Codex (example env) ---\n"
+        + "# source scripts/litellm-bridge/env-for-codex.sh  (or ./codex-via-bridge.sh)\n"
+        + f"export OPENAI_BASE_URL=http://127.0.0.1:{args.litellm_port}/v1\n"
+        + (
+            'export OPENAI_API_KEY="$LITELLM_MASTER_KEY"\n'
+            if args.master_key
+            else "# OPENAI_API_KEY unset — OK if LiteLLM has no master_key\n"
+        )
+        + "codex --model composer-2-fast\n",
         flush=True,
     )
 

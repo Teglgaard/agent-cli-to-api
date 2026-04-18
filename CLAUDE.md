@@ -23,7 +23,7 @@ uv run agent-cli-to-api codex    # start with a provider
   - `rich_logging.py` - Rich terminal logging
   - `doctor.py` - Diagnostic checks
 - `main.py` - Alternative entrypoint
-- `scripts/` - Helper scripts (launchd, smoke test, litellm-bridge)
+- `scripts/` - Helper scripts (launchd, smoke test, litellm-bridge; see `scripts/litellm-bridge/README.md` for Codex CLI + LiteLLM)
 - `test_*.py` - Tests (root-level)
 
 ## Development

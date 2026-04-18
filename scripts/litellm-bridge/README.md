@@ -17,6 +17,8 @@ Claude Code speaks the **Anthropic** HTTP API. **agent-cli-to-api** exposes **Op
 
 ## Super quick run (two terminals)
 
+**Paths:** These scripts live in **agent-cli-to-api**. Running `./scripts/litellm-bridge/...` only works when your current directory is that repo. From another directory, call the script by **absolute path** (as below) or `cd` to `agent-cli-to-api` first.
+
 **Terminal 1 — bridge (leave running)**
 
 ```bash
@@ -54,6 +56,44 @@ This script:
 
 In Claude, use **`/model`** and pick **Composer 2 Fast (local gateway)** (`cursor-composer-2-fast`).
 
+## OpenAI Codex CLI
+
+[OpenAI Codex CLI](https://github.com/openai/codex) uses the **OpenAI-compatible** API. Point it at **LiteLLM** (not the gateway port directly). This repo’s `litellm_config.yaml` uses **`hosted_vllm/composer-2-fast`** so LiteLLM forwards to the gateway on **`/v1/chat/completions`** (avoids `/v1/responses` + `stream: true` errors on this gateway).
+
+**Easiest — one command (starts bridge in the background if it is not already up)**
+
+```bash
+/path/to/agent-cli-to-api/scripts/litellm-bridge/codex-local.sh
+```
+
+Same args as `codex` (optional project dir first), e.g. `codex-local.sh resume <session-id>`. Bridge logs when auto-started go to `/tmp/litellm-bridge.log` unless you set `LITELLM_BRIDGE_LOG`.
+
+**Terminal 2 — Codex (bridge already running)**
+
+```bash
+/path/to/agent-cli-to-api/scripts/litellm-bridge/codex-via-bridge.sh
+```
+
+Or set env yourself (same as `codex-via-bridge.sh`):
+
+```bash
+# Must SOURCE (running the file without `source` does not export into your shell):
+source /path/to/agent-cli-to-api/scripts/litellm-bridge/env-for-codex.sh
+codex --model composer-2-fast
+```
+
+If LiteLLM uses `master_key` auth, **`OPENAI_BASE_URL` alone is not enough** — you need a Bearer token matching `LITELLM_MASTER_KEY` in the repo `.env`. `env-for-codex.sh` sets `OPENAI_API_KEY` and `LITELLM_API_KEY` from that when present.
+
+**Config file:** merge `codex-config.composer-2-fast.toml.example` into `~/.codex/config.toml` (or project `.codex/config.toml`) so `openai_base_url` and `model` persist. The URL must stay **`http://127.0.0.1:4000/v1`** (LiteLLM), not the gateway on `:11435`.
+
+**Troubleshooting — empty Codex chat with `wire_api = "responses"`:** Codex streams the Responses API through LiteLLM to the gateway. LiteLLM validates each SSE event; the gateway shim must emit the same ordering as OpenAI/LiteLLM: after **`response.created`**, **`response.in_progress`** and **`response.output_item.added`**, then deltas with **`content_index`** and a top-level **`model`** field on each event (matching LiteLLM’s stream). If assistant text disappears after an upgrade, pull the latest `agent-cli-to-api` and restart **both** the gateway and the LiteLLM child process (not only one of them).
+
+**Verify the bridge (health + streamed Responses):**
+
+```bash
+/path/to/agent-cli-to-api/scripts/litellm-bridge/verify-codex-bridge.sh
+```
+
 ## Optional: short shell aliases
 
 Add to `~/.zshrc` (adjust `AGENT_CLI_API_HOME`):
@@ -62,9 +102,13 @@ Add to `~/.zshrc` (adjust `AGENT_CLI_API_HOME`):
 export AGENT_CLI_API_HOME="$HOME/Krown-Development/agent-cli-to-api"
 alias bridge-start='$AGENT_CLI_API_HOME/scripts/litellm-bridge/start-bridge.sh'
 alias claude-bridge='$AGENT_CLI_API_HOME/scripts/litellm-bridge/claude-via-bridge.sh'
+alias codex-bridge='$AGENT_CLI_API_HOME/scripts/litellm-bridge/codex-via-bridge.sh'
+alias codex-local='$AGENT_CLI_API_HOME/scripts/litellm-bridge/codex-local.sh'
 ```
 
-Then: `bridge-start` in one terminal, `claude-bridge ~/your/repo` in another.
+Then: **`codex-local`** for one-shot Codex (auto-starts bridge if needed), or `bridge-start` in one terminal and `claude-bridge ~/your/repo` / `codex-bridge` in another.
+
+**Orchestration UIs:** Multi-agent wrappers (for example **Oh-my-codex**) are **separate repositories** — nothing in this folder installs or runs them. For Codex in the terminal with this gateway, use **`codex-local.sh`** / **`codex-via-bridge.sh`** and `env-for-codex.sh` only.
 
 ## Custom LiteLLM port
 
@@ -120,4 +164,8 @@ python test_composer2_live_api.py
 | `env-for-claude.sh` | Env vars for Claude Code → local LiteLLM |
 | `start-bridge.sh` | One-command bridge from a clean shell |
 | `claude-via-bridge.sh` | Health check + env + `claude` |
+| `env-for-codex.sh` | `OPENAI_BASE_URL` / `OPENAI_API_KEY` for Codex → LiteLLM |
+| `codex-via-bridge.sh` | Health check + env + `codex` (default model `composer-2-fast`) |
+| `codex-local.sh` | Start bridge if down, then env + `codex` (single command) |
+| `codex-config.composer-2-fast.toml.example` | Example `openai_base_url` + `model` for `~/.codex/config.toml` |
 | `requirements-bridge.txt` | Optional pinned deps (`litellm[proxy]`, `httpx`) |

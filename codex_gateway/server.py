@@ -39,6 +39,7 @@ from .gemini_cloudcode import generate_cloudcode as gemini_cloudcode_generate
 from .gemini_cloudcode import iter_cloudcode_stream_events as iter_gemini_cloudcode_events
 from .gemini_cloudcode import warmup_gemini_caches
 from .http_client import aclose_all as _aclose_http_clients
+from . import responses_stream_shim
 from .openai_compat import (
     ChatCompletionRequest,
     ChatMessage,
@@ -311,6 +312,17 @@ def _chat_completion_to_responses(chat: dict) -> dict:
     if usage_out is not None:
         resp["usage"] = usage_out
     return resp
+
+
+def _responses_stream_headers_from_inner(inner: StreamingResponse) -> dict[str, str]:
+    """Copy inner SSE headers except hop-by-hop / body-size fields (payload is re-encoded)."""
+    skip = frozenset({"content-length", "content-encoding", "transfer-encoding", "connection"})
+    out: dict[str, str] = {}
+    for key, value in inner.headers.items():
+        if key.lower() in skip:
+            continue
+        out[key] = value
+    return out
 
 
 _UPSTREAM_STATUS_RE = re.compile(r"(?:\bAPI Error:\s*|\bfailed:\s*)(\d{3})\b")
@@ -1232,10 +1244,19 @@ async def responses(
     if not chat_req.messages:
         return _openai_error("Missing input for responses request", status_code=422)
     if chat_req.stream:
-        return _openai_error(
-            "Streaming responses are not supported; set stream=false or use /v1/chat/completions",
-            status_code=400,
-        )
+        # Codex (often via LiteLLM) sends POST /v1/responses with stream=true. Run the same backend
+        # as /v1/chat/completions, then translate chat.completion.chunk SSE into Responses API events
+        # (response.completed, etc.) — raw chat SSE leaves Codex waiting on response.completed.
+        result = await chat_completions(chat_req, request, authorization)
+        if isinstance(result, StreamingResponse):
+            return StreamingResponse(
+                responses_stream_shim.translate_chat_completion_sse_to_responses_sse(
+                    result.body_iterator, model=chat_req.model
+                ),
+                media_type="text/event-stream",
+                headers=_responses_stream_headers_from_inner(result),
+            )
+        return result
 
     result = await chat_completions(chat_req, request, authorization)
     if isinstance(result, (JSONResponse, StreamingResponse)):

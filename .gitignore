@@ -21,3 +21,6 @@ build/
 # Gateway-local Codex home (avoid committing auth/config)
 .codex-gateway-home/
 .codex_home*/
+
+# Working-copy-only dirs from external tools (never part of this package’s releases)
+.omx/

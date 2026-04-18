@@ -1,0 +1,11 @@
+# Merge into ~/.codex/config.toml (or project .codex/config.toml) when using:
+#   scripts/litellm-bridge/start-bridge.sh  → LiteLLM :4000 → gateway :11435 → composer-2-fast
+#
+# Model names must match model_name in scripts/litellm-bridge/litellm_config.yaml (e.g. composer-2-fast).
+# Use openai_base_url (with /v1), not the gateway origin alone.
+#
+# If LiteLLM uses master_key: run `source scripts/litellm-bridge/env-for-codex.sh` in the same shell
+# before `codex` so OPENAI_API_KEY / LITELLM_API_KEY match LITELLM_MASTER_KEY in agent-cli-to-api/.env.
+
+openai_base_url = "http://127.0.0.1:4000/v1"
+model = "composer-2-fast"

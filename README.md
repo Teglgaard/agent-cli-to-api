@@ -90,12 +90,17 @@ BASE_URL=http://127.0.0.1:8000/v1 ./scripts/smoke.sh
 TOKEN=devtoken BASE_URL=http://127.0.0.1:8000/v1 ./scripts/smoke.sh
 ```
 
+### Codex CLI + LiteLLM (local bridge)
+
+The [OpenAI Codex CLI](https://github.com/openai/codex) can talk to this gateway **through LiteLLM** (recommended entry point: `scripts/litellm-bridge/codex-local.sh`, which can start the bridge for you). Full steps, env vars, and health checks: `scripts/litellm-bridge/README.md`.
+
 ## API
 
 - `GET /healthz`
 - `GET /debug/config` (effective runtime config; requires auth if `CODEX_GATEWAY_TOKEN` is set)
 - `GET /v1/models`
 - `POST /v1/chat/completions` (supports `stream`)
+- `POST /v1/responses` — non-stream responses are translated from chat completions; **streaming** requests run the chat-completions SSE backend, then **re-emit Responses API events** (`response.output_text.delta`, `response.completed`, …) so Codex is not left waiting on chat-only chunks
 
 Tip: any OpenAI SDK that supports `base_url` should work by pointing it at this server.
 
