@@ -43,3 +43,9 @@ model_list:
       model: hosted_vllm/cursor:auto
       api_base: os.environ/AGENT_CLI_API_BASE
       api_key: os.environ/AGENT_CLI_API_KEY
+
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: hosted_vllm/composer-2-fast
+      api_base: os.environ/AGENT_CLI_API_BASE
+      api_key: os.environ/AGENT_CLI_API_KEY

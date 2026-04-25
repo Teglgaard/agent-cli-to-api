@@ -88,7 +88,7 @@ async def test_non_streaming():
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
-            "http://localhost:8000/v1/chat/completions",
+            "http://127.0.0.1:8000/v1/chat/completions",
             json={
                 "model": "cursor-agent",
                 "messages": [
@@ -143,7 +143,7 @@ async def test_streaming():
     async with httpx.AsyncClient(timeout=30.0) as client:
         async with client.stream(
             "POST",
-            "http://localhost:8000/v1/chat/completions",
+            "http://127.0.0.1:8000/v1/chat/completions",
             json={
                 "model": "cursor-agent",
                 "messages": [
@@ -155,8 +155,8 @@ async def test_streaming():
             assert response.status_code == 200, f"Expected 200, got {response.status_code}"
             
             print("\nStreaming chunks:")
-            chunks = []
             content_parts = []
+            last_usage = None
             
             async for line in response.aiter_lines():
                 if not line or line.startswith(":"):
@@ -171,32 +171,37 @@ async def test_streaming():
                     
                     try:
                         chunk = json.loads(data_str)
-                        chunks.append(chunk)
-                        
+
                         if "choices" in chunk and chunk["choices"]:
                             delta = chunk["choices"][0].get("delta", {})
                             if "content" in delta:
                                 content = delta["content"]
                                 content_parts.append(content)
                                 print(f"  Delta: {repr(content)}")
-                            
-                            # Check for usage in final chunks
+
                             if "usage" in chunk:
+                                last_usage = chunk["usage"]
                                 print(f"\n  Usage chunk: {json.dumps(chunk['usage'], indent=4)}")
                     except json.JSONDecodeError:
                         continue
-            
+
             full_content = "".join(content_parts)
             print(f"\nAssembled content: {repr(full_content)}")
-            
-            # Find the final chunk with usage
-            # Note: OpenAI streaming format doesn't typically include usage in chunks
-            # But we can verify the content was streamed correctly
+
             assert len(content_parts) > 0, "Should have received content"
             assert full_content, "Should have assembled content"
-            
-            print("\n✅ Streaming works correctly!")
-            print("Note: Token usage is tracked internally and logged by the server.")
+            assert last_usage is not None, (
+                "Final SSE chunk should include OpenAI-style usage (gateway adds it before [DONE])"
+            )
+            assert last_usage.get("prompt_tokens") == 1250, last_usage
+            assert last_usage.get("completion_tokens") == 89, last_usage
+            assert last_usage.get("total_tokens") == 1339, last_usage
+            assert last_usage.get("prompt_tokens_details", {}).get("cached_tokens") == 8500
+
+            print(
+                "\n✅ Streaming returns token usage on the final chunk "
+                "(downstream e.g. LiteLLM / Claude can consume this)."
+            )
             return True
 
 
@@ -236,7 +241,7 @@ async def main():
             # Check if server is running
             try:
                 async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get("http://localhost:8000/health")
+                    response = await client.get("http://127.0.0.1:8000/healthz")
                     print(f"✅ Server is ready (status: {response.status_code})")
             except Exception as e:
                 print(f"⚠️ Health check failed (continuing anyway): {e}")
@@ -266,7 +271,7 @@ async def main():
                 print("=" * 80)
                 print("\nResults:")
                 print("  ✅ Non-streaming mode returns token usage")
-                print("  ✅ Streaming mode works correctly")
+                print("  ✅ Streaming mode includes usage on the final chunk")
                 print("  ✅ Cache tokens are properly tracked")
                 print("\nCursor-agent token usage is now fully functional!")
             else:
